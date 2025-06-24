@@ -3,20 +3,53 @@ let model;
 
 // Feature names in the exact order the model expects them
 const featureOrder = [
-    'Age', 'DailyRate', 'DistanceFromHome', 'Education', 'EmployeeCount', 
-    'EmployeeNumber', 'EnvironmentSatisfaction', 'HourlyRate', 'JobInvolvement', 
-    'JobLevel', 'JobSatisfaction', 'MonthlyRate', 'NumCompaniesWorked', 
-    'PercentSalaryHike', 'PerformanceRating', 'RelationshipSatisfaction', 
-    'StockOptionLevel', 'TotalWorkingYears', 'TrainingTimesLastYear', 
-    'WorkLifeBalance', 'YearsAtCompany', 'YearsInCurrentRole', 
-    'YearsSinceLastPromotion', 'YearsWithCurrManager', 'BusinessTravel_Travel_Frequently', 
-    'BusinessTravel_Travel_Rarely', 'Department_Research & Development', 
-    'Department_Sales', 'EducationField_Life Sciences', 'EducationField_Marketing', 
-    'EducationField_Medical', 'EducationField_Other', 'EducationField_Technical Degree', 
-    'Gender_Male', 'JobRole_Human Resources', 'JobRole_Laboratory Technician', 
-    'JobRole_Manager', 'JobRole_Manufacturing Director', 'JobRole_Research Director', 
-    'JobRole_Research Scientist', 'JobRole_Sales Executive', 'JobRole_Sales Representative', 
-    'MaritalStatus_Married', 'MaritalStatus_Single', 'OverTime_Yes'
+    'Age',                  // 1
+    'DailyRate',            // 2
+    'DistanceFromHome',     // 3
+    'Education',            // 4
+    'EnvironmentSatisfaction', // 5
+    'HourlyRate',           // 6
+    'JobInvolvement',       // 7
+    'JobLevel',             // 8
+    'JobSatisfaction',      // 9
+    'MonthlyIncome',        // 10 - ¡IMPORTANTE! Esta estaba faltando
+    'MonthlyRate',          // 11
+    'NumCompaniesWorked',   // 12
+    'PercentSalaryHike',    // 13
+    'PerformanceRating',    // 14
+    'RelationshipSatisfaction', // 15
+    'StockOptionLevel',     // 16
+    'TotalWorkingYears',    // 17
+    'TrainingTimesLastYear', // 18
+    'WorkLifeBalance',      // 19
+    'YearsAtCompany',       // 20
+    'YearsInCurrentRole',   // 21
+    'YearsSinceLastPromotion', // 22
+    'YearsWithCurrManager', // 23
+    'BusinessTravel_Travel_Frequently', // 24
+    'BusinessTravel_Travel_Rarely', // 25
+    'Department_Research & Development', // 26
+    'Department_Sales',     // 27
+    'EducationField_Life Sciences', // 28
+    'EducationField_Marketing', // 29
+    'EducationField_Medical', // 30
+    'EducationField_Other', // 31
+    'EducationField_Technical Degree', // 32
+    'Gender_Male',         // 33
+    'JobRole_Healthcare Representative', // 34 - ¡Faltaba esta!
+    'JobRole_Human Resources', // 35
+    'JobRole_Laboratory Technician', // 36
+    'JobRole_Manager',      // 37
+    'JobRole_Manufacturing Director', // 38
+    'JobRole_Research Director', // 39
+    'JobRole_Research Scientist', // 40
+    'JobRole_Sales Executive', // 41
+    'JobRole_Sales Representative', // 42
+    'MaritalStatus_Married', // 43
+    'MaritalStatus_Single', // 44
+    'OverTime_Yes',        // 45
+    'EmployeeCount',       // 46 - Generalmente es 1
+    'EmployeeNumber'       // 47 - Podemos usar 0 como default
 ];
 
 // Load model when page loads
@@ -39,17 +72,17 @@ document.addEventListener('DOMContentLoaded', loadModel);
 
 // Function to preprocess input data
 function preprocessInput(data) {
-    // 1. Create object with all features initialized to 0
+    // 1. Inicializar todas las características a 0
     let features = {};
     featureOrder.forEach(feat => features[feat] = 0);
     
-    // 2. Set numerical features from form
+    // 2. Características numéricas del formulario
     features['Age'] = parseFloat(data.age) || 30;
     features['MonthlyIncome'] = parseFloat(data.monthlyIncome) || 5000;
     features['TotalWorkingYears'] = parseFloat(data.totalWorkingYears) || 5;
     features['YearsAtCompany'] = parseFloat(data.yearsAtCompany) || 3;
     
-    // 3. Set default values for other numerical features
+    // 3. Valores por defecto para otras numéricas
     features['DailyRate'] = 800;
     features['DistanceFromHome'] = 10;
     features['Education'] = 3;
@@ -69,27 +102,31 @@ function preprocessInput(data) {
     features['YearsInCurrentRole'] = Math.floor(features['YearsAtCompany'] / 2);
     features['YearsSinceLastPromotion'] = Math.floor(features['YearsAtCompany'] / 3);
     features['YearsWithCurrManager'] = Math.floor(features['YearsAtCompany'] / 2);
+    features['EmployeeCount'] = 1;  // Generalmente es 1
+    features['EmployeeNumber'] = 0; // No es relevante para la predicción
     
-    // 4. Handle form categorical variables
+    // 4. Variables categóricas del formulario
     features['OverTime_Yes'] = data.overTime === 'Yes' ? 1 : 0;
     
     // Business Travel
     features['BusinessTravel_Travel_Frequently'] = data.businessTravel === 'Travel_Frequently' ? 1 : 0;
     features['BusinessTravel_Travel_Rarely'] = data.businessTravel === 'Travel_Rarely' ? 1 : 0;
     
-    // 5. Set defaults for other categoricals
+    // Department
     features['Department_Research & Development'] = 1;
     features['Department_Sales'] = 0;
+    
+    // Education Field
     features['EducationField_Life Sciences'] = 1;
     features['EducationField_Marketing'] = 0;
     features['EducationField_Medical'] = 0;
     features['EducationField_Other'] = 0;
     features['EducationField_Technical Degree'] = 0;
-    features['Gender_Male'] = 1;
-    features['MaritalStatus_Married'] = 0;
-    features['MaritalStatus_Single'] = 1;
     
-    // 6. Handle Job Role
+    // Gender
+    features['Gender_Male'] = 1;
+    
+    // Job Role
     const jobRoleMap = {
         'Sales Executive': 'JobRole_Sales Executive',
         'Research Scientist': 'JobRole_Research Scientist',
@@ -103,8 +140,8 @@ function preprocessInput(data) {
     };
     
     // Reset all job roles
-    Object.keys(jobRoleMap).forEach(role => {
-        features[jobRoleMap[role]] = 0;
+    Object.values(jobRoleMap).forEach(role => {
+        features[role] = 0;
     });
     
     // Set selected job role
@@ -112,19 +149,24 @@ function preprocessInput(data) {
         features[jobRoleMap[data.jobRole]] = 1;
     }
     
-    // 7. Convert to array in correct order
+    // Marital Status
+    features['MaritalStatus_Married'] = 0;
+    features['MaritalStatus_Single'] = 1;
+    
+    // 5. Convertir a array y verificar
     let featureArray = featureOrder.map(feat => {
         if (features[feat] === undefined) {
-            console.warn(`Missing feature: ${feat}`);
+            console.error(`Missing feature in processing: ${feat}`);
             return 0;
         }
         return features[feat];
     });
     
-    // Verification
+    // Verificación crítica
     if (featureArray.length !== 47) {
-        console.error("Feature count mismatch! Expected 47, got", featureArray.length);
+        console.error(`Error: Generated ${featureArray.length} features, expected 47`);
         console.log("Generated features:", featureArray);
+        throw new Error(`Feature count mismatch. Generated ${featureArray.length}, expected 47`);
     }
     
     return featureArray;
