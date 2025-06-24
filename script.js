@@ -1,6 +1,5 @@
 // Global variables for model and scaler
 let model;
-let scaler;
 
 // Feature names in the exact order the model expects them
 const featureOrder = [
@@ -20,77 +19,77 @@ const featureOrder = [
     'MaritalStatus_Married', 'MaritalStatus_Single', 'OverTime_Yes'
 ];
 
-// Load model and scaler when page loads
-async function loadModelAndScaler() {
+// Load model when page loads
+async function loadModel() {
     try {
         // Load the TensorFlow.js model
         model = await tf.loadLayersModel('model_attrition_web/model.json');
+        console.log("Model loaded successfully");
         
-        // Load the scaler (in a real app, you would need to implement the scaler logic)
-        // For this example, we'll simulate it with a placeholder
-        console.log("Model and scaler loaded successfully");
+        // Verificar que el modelo tiene la forma esperada
+        console.log("Model input shape:", model.inputs[0].shape);
     } catch (error) {
-        console.error("Error loading model or scaler:", error);
+        console.error("Error loading model:", error);
+        alert("Error loading the prediction model. Please check console for details.");
     }
 }
 
 // Call the load function when the page loads
-document.addEventListener('DOMContentLoaded', loadModelAndScaler);
+document.addEventListener('DOMContentLoaded', loadModel);
 
 // Function to preprocess input data
-// Function to preprocess input data
 function preprocessInput(data) {
-    // Create a dictionary with all features initialized to 0
+    // 1. Create object with all features initialized to 0
     let features = {};
     featureOrder.forEach(feat => features[feat] = 0);
     
-    // Set numerical features
-    features['Age'] = parseFloat(data.age);
-    features['MonthlyIncome'] = parseFloat(data.monthlyIncome);
-    features['TotalWorkingYears'] = parseFloat(data.totalWorkingYears);
-    features['YearsAtCompany'] = parseFloat(data.yearsAtCompany);
+    // 2. Set numerical features from form
+    features['Age'] = parseFloat(data.age) || 30;
+    features['MonthlyIncome'] = parseFloat(data.monthlyIncome) || 5000;
+    features['TotalWorkingYears'] = parseFloat(data.totalWorkingYears) || 5;
+    features['YearsAtCompany'] = parseFloat(data.yearsAtCompany) || 3;
     
-    // Set default values for other numerical features not in the form
-    features['DailyRate'] = 800;  // Valor promedio aproximado
+    // 3. Set default values for other numerical features
+    features['DailyRate'] = 800;
     features['DistanceFromHome'] = 10;
     features['Education'] = 3;
     features['EnvironmentSatisfaction'] = 3;
+    features['HourlyRate'] = 65;
     features['JobInvolvement'] = 3;
     features['JobLevel'] = 2;
     features['JobSatisfaction'] = 3;
+    features['MonthlyRate'] = 20000;
     features['NumCompaniesWorked'] = 2;
     features['PercentSalaryHike'] = 15;
     features['PerformanceRating'] = 3;
     features['RelationshipSatisfaction'] = 3;
     features['StockOptionLevel'] = 0;
-    features['TrainingTimesLastYear'] = 2;
+    features['TrainingTimesLastYear'] = 3;
     features['WorkLifeBalance'] = 3;
-    features['YearsInCurrentRole'] = Math.floor(parseFloat(data.yearsAtCompany) / 2);
-    features['YearsSinceLastPromotion'] = Math.floor(parseFloat(data.yearsAtCompany) / 3);
-    features['YearsWithCurrManager'] = Math.floor(parseFloat(data.yearsAtCompany) / 2);
+    features['YearsInCurrentRole'] = Math.floor(features['YearsAtCompany'] / 2);
+    features['YearsSinceLastPromotion'] = Math.floor(features['YearsAtCompany'] / 3);
+    features['YearsWithCurrManager'] = Math.floor(features['YearsAtCompany'] / 2);
     
-    // Handle categorical variables from the form
+    // 4. Handle form categorical variables
     features['OverTime_Yes'] = data.overTime === 'Yes' ? 1 : 0;
     
     // Business Travel
     features['BusinessTravel_Travel_Frequently'] = data.businessTravel === 'Travel_Frequently' ? 1 : 0;
     features['BusinessTravel_Travel_Rarely'] = data.businessTravel === 'Travel_Rarely' ? 1 : 0;
     
-    // Department (asumimos Research & Development como valor por defecto)
+    // 5. Set defaults for other categoricals
     features['Department_Research & Development'] = 1;
     features['Department_Sales'] = 0;
-    
-    // Education Field (asumimos Life Sciences como valor por defecto)
     features['EducationField_Life Sciences'] = 1;
     features['EducationField_Marketing'] = 0;
     features['EducationField_Medical'] = 0;
     features['EducationField_Other'] = 0;
     features['EducationField_Technical Degree'] = 0;
-    
-    // Gender (asumimos Male como valor por defecto)
     features['Gender_Male'] = 1;
+    features['MaritalStatus_Married'] = 0;
+    features['MaritalStatus_Single'] = 1;
     
-    // Job Role
+    // 6. Handle Job Role
     const jobRoleMap = {
         'Sales Executive': 'JobRole_Sales Executive',
         'Research Scientist': 'JobRole_Research Scientist',
@@ -103,20 +102,30 @@ function preprocessInput(data) {
         'Human Resources': 'JobRole_Human Resources'
     };
     
-    // Reset all job roles to 0 first
-    featureOrder.filter(f => f.startsWith('JobRole_')).forEach(f => features[f] = 0);
+    // Reset all job roles
+    Object.keys(jobRoleMap).forEach(role => {
+        features[jobRoleMap[role]] = 0;
+    });
     
-    // Set the selected job role
+    // Set selected job role
     if (jobRoleMap[data.jobRole]) {
         features[jobRoleMap[data.jobRole]] = 1;
     }
     
-    // Marital Status (asumimos Single como valor por defecto)
-    features['MaritalStatus_Married'] = 0;
-    features['MaritalStatus_Single'] = 1;
+    // 7. Convert to array in correct order
+    let featureArray = featureOrder.map(feat => {
+        if (features[feat] === undefined) {
+            console.warn(`Missing feature: ${feat}`);
+            return 0;
+        }
+        return features[feat];
+    });
     
-    // Convert the features object to an array in the correct order
-    let featureArray = featureOrder.map(feat => features[feat]);
+    // Verification
+    if (featureArray.length !== 47) {
+        console.error("Feature count mismatch! Expected 47, got", featureArray.length);
+        console.log("Generated features:", featureArray);
+    }
     
     return featureArray;
 }
@@ -128,39 +137,37 @@ async function predictAttrition() {
         return;
     }
     
-    // Verificar que todos los elementos existen antes de continuar
-    const requiredElements = [
-        'age', 'monthlyIncome', 'jobRole', 'totalWorkingYears', 
-        'yearsAtCompany', 'overTime', 'businessTravel'
-    ];
-    
-    const missingElements = requiredElements.filter(id => !document.getElementById(id));
-    
-    if (missingElements.length > 0) {
-        console.error("Missing elements:", missingElements);
-        alert(`Error: Missing form elements (${missingElements.join(', ')}). Check your HTML.`);
-        return;
-    }
-    
-    // Get input values (solo si todos los elementos existen)
-    const inputData = {
-        age: document.getElementById('age').value,
-        monthlyIncome: document.getElementById('monthlyIncome').value,
-        jobRole: document.getElementById('jobRole').value,
-        totalWorkingYears: document.getElementById('totalWorkingYears').value,
-        yearsAtCompany: document.getElementById('yearsAtCompany').value,
-        overTime: document.getElementById('overTime').value,
-        businessTravel: document.getElementById('businessTravel').value
-    };
-    
     try {
+        // Verify all required elements exist
+        const requiredElements = ['age', 'monthlyIncome', 'jobRole', 'totalWorkingYears', 
+                                'yearsAtCompany', 'overTime', 'businessTravel'];
+        const missingElements = requiredElements.filter(id => !document.getElementById(id));
+        
+        if (missingElements.length > 0) {
+            throw new Error(`Missing form elements: ${missingElements.join(', ')}`);
+        }
+        
+        // Get input values
+        const inputData = {
+            age: document.getElementById('age').value,
+            monthlyIncome: document.getElementById('monthlyIncome').value,
+            jobRole: document.getElementById('jobRole').value,
+            totalWorkingYears: document.getElementById('totalWorkingYears').value,
+            yearsAtCompany: document.getElementById('yearsAtCompany').value,
+            overTime: document.getElementById('overTime').value,
+            businessTravel: document.getElementById('businessTravel').value
+        };
+        
         // Preprocess the input
         const processedInput = preprocessInput(inputData);
         
-        // Convert to tensor
-        const inputTensor = tf.tensor2d([processedInput]);
+        // Verify feature count
+        if (processedInput.length !== 47) {
+            throw new Error(`Feature count mismatch. Expected 47, got ${processedInput.length}`);
+        }
         
-        // Make prediction
+        // Convert to tensor and predict
+        const inputTensor = tf.tensor2d([processedInput], [1, 47]);
         const prediction = model.predict(inputTensor);
         const probability = (await prediction.data())[0];
         
@@ -170,9 +177,10 @@ async function predictAttrition() {
         // Clean up
         inputTensor.dispose();
         prediction.dispose();
+        
     } catch (error) {
         console.error("Prediction error:", error);
-        alert("An error occurred during prediction. Check console for details.");
+        alert(`Prediction failed: ${error.message}. Check console for details.`);
     }
 }
 
